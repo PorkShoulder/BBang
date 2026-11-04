@@ -1,0 +1,48 @@
+# Visual Studio user state and local IDE caches
+.vs/
+*.user
+*.suo
+*.VC.db
+*.VC.opendb
+*.sln.docstates
+
+# Build directories (keep project and build configuration files)
+[Bb]uild/
+[Bb]uild-*/
+[Oo]ut/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+Testing/
+
+# Compiled artifacts
+*.obj
+*.o
+*.pch
+*.pdb
+*.idb
+*.ilk
+*.tlog/
+*.lastbuildstate
+*.exe
+*.dll
+*.lib
+*.exp
+*.ipch
+
+# OS files and local secrets
+.DS_Store
+Thumbs.db
+Desktop.ini
+.env
+.env.*
+!.env.example
+
+# Checked-in runtime dependency binaries (not project build output)
+!third_party/SFML-3.1.0/lib/*.lib
+!third_party/SFML-3.1.0/bin/*.dll
