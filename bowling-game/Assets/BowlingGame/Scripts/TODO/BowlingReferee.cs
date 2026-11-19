@@ -491,12 +491,13 @@ public sealed class BowlingReferee : MonoBehaviour
         return splitCases.Contains(standingPinMask);
     }
 
-    public static int CountPins(ushort mask)
+    public static int CountPins(ushort mask) // 핀 계산기
     {
         int count = 0;
-        while (mask != 0)
+        while (mask != 0) // 받아온 값이 0이 아닐경우
         {
-            mask = (ushort)(mask & (mask - 1));
+
+            mask = (ushort)(mask & (mask - 1)); // 비트 연산자임
             ++count;
         }
         return count;
@@ -524,9 +525,9 @@ public sealed class BowlingReferee : MonoBehaviour
             || (standingPinMask & ~board.StandingPinMask) != 0)
             return false;
 
-        int frameNumber = board.CurrentFrameNumber;
-        int rollNumber = board.CurrentRollNumber;
-        var frame = board.GetFrame(frameNumber);
+        int frameNumber = board.CurrentFrameNumber; // 현재 몇번째인지
+        int rollNumber = board.CurrentRollNumber;   // 프레임당 2번 던지는데 그 중 지금이 1,2 중 몇번째인지 알기위함.
+        var frame = board.GetFrame(frameNumber);    // var = auto (c++)
         if (frame == null || frame.Rolls.Count != rollNumber - 1)
             return false;
 
@@ -538,21 +539,121 @@ public sealed class BowlingReferee : MonoBehaviour
         bool isFreshRack = rollNumber == 1
             || (isFinalFrame && frame.Rolls[rollNumber - 2].AfterPinMask == 0);
 
+        // NOTE (LHJ)
+        // roll : 공을 한 번 던지는 것.
+        // rack : 핀 10개 -> 한세트
+        // frame : 점수를 매기는 단위 한 경기당 10 (frame) / N번째인지 생각하기
+
         // TODO: mark를 판정하세요.
         BowlingRollMark mark = BowlingRollMark.None;
 
+        // 스트라이크, 스페어, 스플릿 판정하는 로직을 구현하기
+
+
+
+
+        if (isFreshRack && pinCount == 10)
+        {
+            // 1. 스트라이크 
+            // 조건: 첫 투구에서 핀 10개를 모두 쓰러뜨렸을 때 -> 핀의 상태가 (0)개 00_0000_0000 이면 스트라이크
+            // 2가지 조건을 만족해야합니다. 첫 투구일것-(1), 남아있는 핀이 없을 것-(2)
+            mark = BowlingRollMark.Strike;
+        }
+        else if (rollNumber == 2 && afterPinMask == 0)
+        {
+            // 2. 스페어
+            // 조건 : 두 번째 투구에서 남아있는 핀들을 전부 쓰러뜨렸을 때 -> 핀의 상태가 (0)개 00_0000_0000 이면 스페어
+            // 2가지 조건을 만족해야함. 2번째 투구일것-(1), 남아있는 핀이 없을 것-(2)
+
+            mark = BowlingRollMark.Spare;
+        }
+        else if (afterPinMask > beforePinMask)
+        {
+            // 3. 스플릿
+            // 조건 : 투구 상관없이 이전 핀보다 숫자가 줄어 들면 스플릿임 
+            // beforePinMask 가 afterPinMask보다 클 경우 
+            mark = BowlingRollMark.Split;
+        }
+        else if (pinCount == 0)
+        {
+            // 4. 미스
+            // 조건 : 핀의 변화가 아무것도 없을 경우 
+            mark = BowlingRollMark.Miss;
+        }
+
+        // NOTE (LHJ) 
+        // mark : 볼을 굴린후 결과값을(BowlingRollMark) 말함. -> 스트라이크, 스페어, 오픈 등등
+
+
         // TODO: 일반 프레임과 10프레임의 다음 투구 상태를 결정하세요.
-        /*
-        bool isFrameComplete = false;
-        bool isGameFinished = false;
-        bool shouldResetRack = false;
+        //
+
+        // NOTE (LHJ) 
+        // 동작 순서? 생각 
+        // ex) 스트라이크 -> mark = BowlingRollMark.Strike : 핀의 개수 확인 -> 판정(mark) 
+        // -> 다음 투구 상태 결정 (프레임 끝, 게임 끝, 핀 재설정 여부, 다음 프레임 번호, 다음 투구 번호, 다음 투구 시작 시 서 있어야 할 핀의 비트 마스크)
+        // -> 판정 로직을 이용해서 1~9프레임 그리고 10 프레임을 조건을 설정해야함. 
+
+        bool isFrameComplete = false;   // 이번 투구로 프레임이 끝났어요
+        bool isGameFinished = false;    // 10프레임에서 마지막 투구가 끝났어요
+        bool shouldResetRack = false;   // 다음 투구 전에 핀 10개를 다시 세워야 해요
         int nextFrameNumber = frameNumber;
         int nextRollNumber = rollNumber + 1;
         ushort nextRollStandingPinMask = afterPinMask;
 
+        // 프레임 작성하기
+        // 1~9프레임 
+
+        if (!isFinalFrame) 
+        {
+            // 1~9 프레임 일단 프레임이 끝나야함.
+            // 프레임이 끝나려면 스트라이크 or 투구수가 2회 일 경우
+            if (mark == BowlingRollMark.Strike || nextRollNumber == 2)
+            {
+                // 조건에 부합 할 경우 프레임이 하나가 종료된걸로보고 초기화 해줘야함.
+
+                isFrameComplete = true; // 프레임은 끝났고,
+                shouldResetRack = true; // 핀10개 다시 세워주고
+                nextFrameNumber = frameNumber +1;
+                nextRollNumber = 1;
+                nextRollStandingPinMask = BowlingLaneBlackboard.FullRackMask;
+
+            }
+            else // 10 프레임 -> 경기가 끝나야함 투구수는 최대 3번 진행함. 
+            {
+
+                // 첫구는 상관없음
+                // 2번째 구가 스트라이크 일 경우 3구가능
+                if (rollNumber == 3)
+                {
+                    // 3투구는 항상 마지막
+                    isFrameComplete = true;
+                    isGameFinished = true;
+                }
+                else if (remainingPinCount == 0)
+                {
+                    // 스트라이크나 스페어: 다시 세우고 계속
+                    shouldResetRack = true;
+                    nextRollStandingPinMask = BowlingLaneBlackboard.FullRackMask;
+                }
+                else if (rollNumber == 2 && !isFreshRack)
+                {
+                    // 같은 랙에서 2투구를 던졌는데 핀이 남음 = 합 10 미만
+                    isFrameComplete = true;
+                    isGameFinished = true;
+                }
+            }
+        
+        }
+        
+
+
+
+
+        // 프레임을 결정함. 
         decision = new BowlingRollDecision(isFrameComplete, isGameFinished, shouldResetRack,
             nextFrameNumber, nextRollNumber, nextRollStandingPinMask);
-        */
+        
 
         // 결정이 채워지기 전에는 경기 기록을 갱신하지 않습니다.
         if (decision.NextFrameNumber == 0)
@@ -577,6 +678,8 @@ public sealed class BowlingReferee : MonoBehaviour
         }
 
         // TODO: 프레임 점수와 누적 점수 계산을 구현하세요.
+
+
     }
 }
 
